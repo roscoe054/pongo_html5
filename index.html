@@ -1,0 +1,217 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<title>Pongo</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,user-scalable=no, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+	<link rel="stylesheet" type="text/css" href="./pongo.css">
+</head>
+
+<body id="body" onclick="ready()">
+<h1 id="title">Pongo Pongo</h1>
+<canvas id="canvas" >
+	当前浏览器不支持
+</canvas>
+<p id="hint">Tap when ready!<p/>
+
+<script>
+//dom
+var hint=document.getElementById('hint');
+var title=document.getElementById('title');
+
+//常量
+var w=document.body.clientWidth;
+var h=document.body.clientWidth;
+var ballV=3;
+var PI=Math.PI;
+var round={x:w/2, y:h/2, r:w*0.45};
+var ball={x:w/2, y:h/2, r:w*0.04, vx:0, vy:ballV};
+var board={x:w/2, y:h/2, r:round.r*1.02, br:0.42, len:0.16, v:-0.02}
+var canvas=document.getElementById('canvas');
+canvas.width=w;
+canvas.height=h;
+
+//变量
+var pongoNum=1;
+var ani=null;
+var status=0;
+var doNotJudge=false;
+var notTouch=true;
+var fade=false;
+var opacity=1;
+var dx=0;
+var dy=0;
+var d=0;
+
+//canvas
+if(canvas.getContext('2d')){
+	var cxt=canvas.getContext('2d');
+}else{
+	alert("当前浏览器不支持");
+}
+
+window.onload=function(){
+	setup();
+};
+
+function setup(){
+	pongoNum=1;
+	doNotJudge=false;
+	notTouch=true;
+	fade=false;
+	opacity=1;
+	title.innerHTML="Pongo Pongo";
+
+	round={x:w/2, y:h/2, r:w*0.45};
+	ball={x:w/2, y:h/2, r:w*0.04, vx:0, vy:ballV};
+	board={x:w/2, y:h/2, r:round.r*1.02, br:0.42, len:0.16, v:-0.015}
+
+	//大圆
+	cxt.fillStyle="#fff";
+	cxt.beginPath();
+	cxt.arc(round.x,round.y,round.r,0,2*PI);
+	cxt.closePath();
+	cxt.fill();
+
+	//小圆
+	cxt.fillStyle="red";
+	cxt.beginPath();
+	cxt.arc(ball.x, ball.y, ball.r, 0, 2*PI);
+	cxt.closePath();
+	cxt.fill();
+
+	//圆弧
+	cxt.lineWidth=4;
+	cxt.strokeStyle="red";
+	cxt.beginPath();
+	cxt.arc(board.x, board.y, board.r, board.br*PI, (board.br+board.len)*PI);
+	cxt.stroke();
+}
+
+function ready(){
+	clearInterval(ani);
+
+	status++;
+	if(status==0){
+		clearInterval(ani);
+		cxt.clearRect(0, 0, cxt.canvas.width, cxt.canvas.height);
+		setup();
+		hint.innerHTML="Tap when ready!";
+		return 0;
+	}else if(status==1){
+		hint.innerHTML="Tap to Go!";
+	}else if(status>1){
+		hint.innerHTML="Go!";
+		board.v=-board.v;
+	}
+
+	ani=setInterval(
+		function(){
+			render();
+			update();
+		},
+		25
+	)
+
+	function update(){
+		if(status>1&&notTouch){
+			ball.x += ball.vx;
+			ball.y += ball.vy;
+		}
+		board.br += board.v;
+
+		//到达边缘，进行
+		dx=Math.abs(round.x-ball.x);
+		dy=Math.abs(round.y-ball.y);
+		d=Math.sqrt(dx*dx+dy*dy)-2;
+		if(d>round.r-ball.r&&d<round.r+ball.r&&!doNotJudge){//到达切点
+			var dxs=ball.r*dx/d;//切点x偏移
+			var px=ball.x>round.x?ball.x+dxs:ball.x-dxs;//切点x坐标
+			var arcStartDx=Math.cos(board.br%2*PI)*round.r;//borad起点X偏移
+			var arcEndDx=Math.cos((board.br+board.len)%2*PI)*round.r;//borad终点X偏移
+			var arcStartX=round.x+arcStartDx;////borad起点X坐标
+			var arcEndX=round.x+arcEndDx;//borad重点X坐标
+			var edge=0.08;//边界范围系数
+			var onSameSide=!((ball.y>round.y&&(board.br>1+board.len&&board.br<2-board.len))
+							||(ball.y<round.y&&(board.br>0+board.len&&board.br<1-board.len)));//是否在同一边
+			if(((px>arcStartX*(1-edge)&&px<arcEndX*(1+edge))||(px>arcEndX*(1-edge)&&px<arcStartX*(1+edge)))&&onSameSide){//发生碰撞
+				// console.log("col");
+				var dir=ball.vy/Math.abs(ball.vy);
+
+				//确定左右端点
+				var lbx;
+				var rbx;
+				if(arcStartX<arcEndX){
+					lbx=arcStartX;
+					rbx=arcEndX;
+				}else{
+					lbx=arcEndX;
+					rbx=arcStartX;
+				}
+
+				var k=((px-lbx)/(rbx-lbx)-0.5);//切点处于端点之间的位置系数，范围-1~+1
+				ball.vx=k*ballV;
+				ball.vy=Math.sqrt(ballV*ballV-ball.vx*ball.vx)*(-dir);
+				// console.log(ball.vx,ball.vy);
+
+				title.innerHTML=pongoNum+"";
+				pongoNum++;
+
+				//设置间隔时间不进行判断
+				doNotJudge=true;
+				setTimeout(function(){
+					doNotJudge=false;
+				}, 
+				300
+				)
+			}else{
+				// console.log("no col");
+			}
+		}else if(d>round.r+ball.r){
+			hint.innerHTML="GAME OVER<br/>Tap to Restart";
+			// status=-1;
+			fade=true;
+		}
+		if(fade&&opacity>0.1){
+			opacity-=0.05;
+			status=-1;
+		}else if(opacity<=0.1){
+			opacity=0;
+		}
+	}
+
+	function render(){
+		cxt.clearRect(0, 0, cxt.canvas.width, cxt.canvas.height);
+
+		//大圆
+		cxt.fillStyle="#fff";
+		cxt.beginPath();
+		cxt.arc(round.x,round.y,round.r,0,2*PI);
+		cxt.closePath();
+		cxt.fill();
+
+		//小圆
+		cxt.globalAlpha=opacity;
+		cxt.fillStyle="red";
+		cxt.beginPath();
+		cxt.arc(ball.x, ball.y, ball.r, 0, 2*PI);
+		cxt.closePath();
+		cxt.fill();
+
+		//圆弧
+		cxt.lineWidth=4;
+		cxt.strokeStyle="red";
+		cxt.beginPath();
+		cxt.arc(board.x, board.y, board.r, board.br*PI, (board.br+board.len)*PI);
+		cxt.stroke();
+		cxt.globalAlpha=1;
+	}
+	
+}
+
+</script>
+</body>
+</html>
